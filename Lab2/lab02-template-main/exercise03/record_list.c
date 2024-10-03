@@ -24,4 +24,8 @@ record_t* append(record_t* tail, float avg, float sdv) {
 
 record_t* next(record_t* elem) {
     // TODO: given an element of the list, return the next element
+    if (elem == NULL) {
+        return NULL;
+    }
+    return elem->next;
 }

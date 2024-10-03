@@ -38,7 +38,11 @@ int main(int argc, char** argv) {
     // TODO: write the list to the output file
     // Each line of the output file should contain the average and the standard deviation
     // as a comma-separated pair (e.g., "1.23,4.56")
+    // Write the list to the output file
+    write_list_to_file(head, "output.csv");
 
+    // Free all the memory allocated for the list
+    free_list(head);
 
     // TODO: free all the memory allocated for the list
 
