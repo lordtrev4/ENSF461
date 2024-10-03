@@ -1,6 +1,12 @@
 #include "util.h"
 
 int* read_next_line(FILE* fin) {
+    // TODO: This function reads the next line from the input file
+    // The line is a comma-separated list of integers
+    // Return the list of integers as an array where the first element
+    // is the number of integers in the rest of the array
+    // Return NULL if there are no more lines to read
+
     char buffer[1024];
     if (fgets(buffer, sizeof(buffer), fin) == NULL) {
         return NULL;
