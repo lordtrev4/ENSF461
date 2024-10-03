@@ -29,3 +29,4 @@ record_t* next(record_t* elem) {
     }
     return elem->next;
 }
+

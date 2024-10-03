@@ -3,6 +3,30 @@
 #include "record_list.h"
 #include "util.h"
 
+// Function to write the list to the output file
+void write_list_to_file(record_t* head, const char* filename) {
+    FILE* fout = fopen(filename, "w");
+    if (fout == NULL) {
+        fprintf(stderr, "Error: unable to open/create file %s\n", filename);
+        return;
+    }
+    record_t* current = head;
+    while (current != NULL) {
+        fprintf(fout, "%.2f,%.2f\n", current->avg, current->sdv);
+        current = current->next;
+    }
+    fclose(fout);
+}
+
+// Function to free the memory allocated for the list
+void free_list(record_t* head) {
+    record_t* current = head;
+    while (current != NULL) {
+        record_t* next = current->next;
+        free(current);
+        current = next;
+    }
+}
 
 int main(int argc, char** argv) {
 
