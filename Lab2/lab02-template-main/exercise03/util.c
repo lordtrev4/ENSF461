@@ -41,7 +41,7 @@ int* read_next_line(FILE* fin) {
 float compute_average(int* line) {
     // TODO: Compute the average of the integers in the vector
     // Recall that the first element of the vector is the number of integers
-     int count = line[0];
+    int count = line[0];
     int sum = 0;
     for (int i = 1; i <= count; i++) {
         sum += line[i];
@@ -54,7 +54,7 @@ float compute_average(int* line) {
 float compute_stdev(int* line) {
     // TODO: Compute the standard deviation of the integers in the vector
     // Recall that the first element of the vector is the number of integers
-        int count = line[0];
+    int count = line[0];
     float mean = compute_average(line);
     float sum = 0.0;
     for (int i = 1; i <= count; i++) {

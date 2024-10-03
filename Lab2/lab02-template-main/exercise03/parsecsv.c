@@ -42,10 +42,9 @@ int main(int argc, char** argv) {
     write_list_to_file(head, "output.csv");
 
     // Free all the memory allocated for the list
-    free_list(head);
 
     // TODO: free all the memory allocated for the list
-
+    free_list(head);
 
     return 0;
 }
