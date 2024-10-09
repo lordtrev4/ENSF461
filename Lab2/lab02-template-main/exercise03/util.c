@@ -8,6 +8,7 @@ int* read_next_line(FILE* fin) {
     // Return NULL if there are no more lines to read
 
     char buffer[1024];
+    long pos = ftell(fin); 
     if (fgets(buffer, sizeof(buffer), fin) == NULL) {
         return NULL;
     }
@@ -28,7 +29,7 @@ int* read_next_line(FILE* fin) {
     result[0] = count;
 
     // Reset the file pointer to the start of the current line
-    fseek(fin, -strlen(buffer), SEEK_CUR);
+    fseek(fin, pos, SEEK_SET);
     fgets(buffer, sizeof(buffer), fin);
     token = strtok(buffer, ",");
     for (int i = 1; i <= count; i++) {
