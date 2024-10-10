@@ -5,6 +5,7 @@
 #include <sys/wait.h>
 #include "parser.h"
 #include <string.h>
+#include <stdlib.h>
 
 #define MAX_VARIABLES 1000  // Define a maximum number of variables
 
@@ -28,7 +29,7 @@ int read_line(int infile, char *buffer, int maxlen)
 
         if (res == 0)
         {
-            break; // End of File, return 0
+            break; // end of file
         }
         if (res < 0)
         { // Read Error
@@ -38,11 +39,11 @@ int read_line(int infile, char *buffer, int maxlen)
         buffer[readlen++] = ch;
         if (ch == '\n')
         {
-            break; // End of line
+            break; // end of line
         }
     }
 
-    buffer[readlen] = '\0'; // Null terminate the string
+    buffer[readlen] = '\0'; 
     return readlen;
 }
 
@@ -168,7 +169,7 @@ void execute_command(token_t **tokens, int numtokens)
         // Extract the command and its arguments
         for (int i = 0; i < numtokens; i++)
         {
-            argv[arg_count] = tokens[i]->value; // Store token's value as an argument
+            argv[arg_count] = tokens[i]->value; // token value as arguement
             arg_count++;
         }
 
@@ -207,10 +208,11 @@ void execute_command(token_t **tokens, int numtokens)
     }
 }
 
+
 void update_variable(char *name, char *value)
 // update or create a variable
 {
-    // Check if variable already exists and update it
+    // check is variable exists and updates
     for (int i = 0; i < variable_count; i++) {
         if (strcmp(variables[i].name, name) == 0) {
             free(variables[i].value);
@@ -219,7 +221,7 @@ void update_variable(char *name, char *value)
         }
     }
     
-    // If not found, add new variable
+    // adding new variable
     variables[variable_count].name = strdup(name);
     variables[variable_count].value = strdup(value);
     variable_count++;
@@ -258,7 +260,7 @@ int main(int argc, char *argv[])
     while (1)
     {
 
-        // Load the next line
+        // load next line
         readlen = read_line(infile, buffer, 1024);
         if (readlen < 0)
         {
@@ -275,39 +277,23 @@ int main(int argc, char *argv[])
         token_t **tokens = tokenize(buffer, readlen, &numtokens);
         assert(numtokens > 0);
 
-        // Parse token list
-        // * Organize tokens into command parameters
-        // * Check if command is a variable assignment
-        // * Check if command has a redirection
-        // * Expand variables if any
-        // * Normalize executables
-        // * Check if pipes are present
-
-        // * Check if pipes are present
-        // TODO
-
-        // Run commands
-        // * Fork and execute commands
-        // * Handle pipes
-        // * Handle redirections
-        // * Handle pipes
-        // * Handle variable assignments
-        // TODO
         if (strchr(buffer, '=') != NULL) {
             // Handle variable assignment
             char *name = strtok(buffer, " =");
-            char *value = strtok(NULL, "\n"); // Get the rest of the line as value
-            update_variable(name, value);
-            continue; // Skip executing this line
+            char *value = strtok(NULL, "\n"); 
+            if (value != NULL) {
+                update_variable(name, value);
+            }
+            continue; 
         }
 
         for (int i = 0; i < numtokens; i++) {
             if (tokens[i]->type == TOKEN_VAR && tokens[i]->value[0] == '$') {
-                char *var_name = tokens[i]->value + 1; // Skip the '$'
+                char *var_name = tokens[i]->value + 1; 
                 char *var_value = lookup_variable(var_name);
                 if (var_value != NULL) {
                     free(tokens[i]->value);
-                    tokens[i]->value = strdup(var_value); // Replace with the variable's value
+                    tokens[i]->value = strdup(var_value); 
                 }
             }
         }
@@ -331,3 +317,4 @@ int main(int argc, char *argv[])
 
     return 0;
 }
+
