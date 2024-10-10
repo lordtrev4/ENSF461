@@ -55,7 +55,7 @@ void redirect(token_t **tokens, int numtokens)
             free(tokens[i + 1]->value);
             free(tokens[i + 1]);
 
-            for (int j = 1; j < numtokens - 2; j++)
+            for (int j = i; j < numtokens - 2; j++)
             {
                 tokens[j] = tokens[j + 2];
             }
@@ -65,50 +65,132 @@ void redirect(token_t **tokens, int numtokens)
     }
 }
 
-// Function to execute a command
-void execute_command(token_t **tokens, int numtokens)
+void pipe_command(token_t **left_tokens, int left_numtokens, token_t **right_tokens, int right_numtokens)
 {
-    char *argv[64];
-    int arg_count = 0;
+    int pipe_fd[2];
 
-    // Extract the command and its arguments
-    for (int i = 0; i < numtokens; i++)
+    if (pipe(pipe_fd) == -1)
     {
-        argv[arg_count] = tokens[i]->value; // Store token's value as an argument
-        arg_count++;
+        perror("Error: pipe failed");
+        exit(EXIT_FAILURE);
     }
-
-    // Terminate the argument list for execve
-    argv[arg_count] = NULL;
-
-    if (arg_count == 0)
+    pid_t pid1 = fork();
+    if (pid1 == 0)
     {
-        // No command to execute
-        fprintf(stderr, "No command given.\n");
-        return;
-    }
+        dup2(pipe_fd[1], STDOUT_FILENO);
+        close(pipe_fd[0]);
+        close(pipe_fd[1]);
 
-    // Fork the process to run the command
-    pid_t pid = fork();
-    if (pid == 0)
-    {
-        redirect(tokens, numtokens);
-        // Child process: execute the command
+        char *argv[64];
+        for (int i = 0; i < left_numtokens; i++)
+        {
+            argv[i] = left_tokens[i]->value;
+        }
+        argv[left_numtokens] = NULL;
+
         if (execvp(argv[0], argv) == -1)
         {
-            perror("execvp failed");
+            perror("Error: execvp failed for left command");
             exit(EXIT_FAILURE);
         }
     }
-    else if (pid > 0)
+    pid_t pid2 = fork();
+    if (pid2 == 0)
     {
-        // Parent process: wait for the child to complete
-        wait(NULL);
+        dup2(pipe_fd[0], STDIN_FILENO);
+        close(pipe_fd[0]);
+        close(pipe_fd[1]);
+
+        redirect(right_tokens, right_numtokens);
+
+        char *argv[64];
+        int arg_count = 0;
+        for (int i = 0; i < right_numtokens; i++)
+        {
+            argv[arg_count] = right_tokens[i]->value;
+            arg_count++;
+        }
+        argv[right_numtokens] = NULL;
+
+        if (execvp(argv[0], argv) == -1)
+        {
+            perror("Error: execvp failed for right command");
+            exit(EXIT_FAILURE);
+        }
+    }
+    close(pipe_fd[0]);
+    close(pipe_fd[1]);
+    waitpid(pid1, NULL, 0);
+    waitpid(pid2, NULL, 0);
+}
+
+// Function to execute a command
+void execute_command(token_t **tokens, int numtokens)
+{
+    int pipe_index = -1;
+    for (int i = 0; i < numtokens; i++)
+    {
+        if (tokens[i]->type == TOKEN_PIPE)
+        {
+            pipe_index = i;
+            break;
+        }
+    }
+
+    if (pipe_index != -1)
+    {
+        token_t **left_tokens = tokens;
+        int left_numtokens = pipe_index;
+
+        token_t **right_tokens = &tokens[pipe_index + 1];
+        int right_numtokens = numtokens - pipe_index - 1;
+
+        pipe_command(left_tokens, left_numtokens, right_tokens, right_numtokens);
     }
     else
     {
-        // Fork failed
-        perror("fork failed");
+        char *argv[64];
+        int arg_count = 0;
+
+        // Extract the command and its arguments
+        for (int i = 0; i < numtokens; i++)
+        {
+            argv[arg_count] = tokens[i]->value; // Store token's value as an argument
+            arg_count++;
+        }
+
+        // Terminate the argument list for execve
+        argv[arg_count] = NULL;
+
+        if (arg_count == 0)
+        {
+            // No command to execute
+            fprintf(stderr, "No command given.\n");
+            return;
+        }
+
+        // Fork the process to run the command
+        pid_t pid = fork();
+        if (pid == 0)
+        {
+            redirect(tokens, numtokens);
+            // Child process: execute the command
+            if (execvp(argv[0], argv) == -1)
+            {
+                perror("execvp failed");
+                exit(EXIT_FAILURE);
+            }
+        }
+        else if (pid > 0)
+        {
+            // Parent process: wait for the child to complete
+            wait(NULL);
+        }
+        else
+        {
+            // Fork failed
+            perror("fork failed");
+        }
     }
 }
 
