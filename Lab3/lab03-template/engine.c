@@ -35,6 +35,36 @@ int read_line(int infile, char *buffer, int maxlen)
     return readlen;
 }
 
+void redirect(token_t **tokens, int numtokens)
+{
+    for (int i = 0; i < numtokens; i++)
+    {
+        if (tokens[i]->type == TOKEN_REDIR)
+        {
+            int fd = open(tokens[i + 1]->value, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+            if (fd < 0)
+            {
+                perror("Error: Cannot Open File");
+                exit(EXIT_FAILURE);
+            }
+            dup2(fd, STDOUT_FILENO);
+            close(fd);
+
+            free(tokens[i]->value);
+            free(tokens[i]);
+            free(tokens[i + 1]->value);
+            free(tokens[i + 1]);
+
+            for (int j = 1; j < numtokens - 2; j++)
+            {
+                tokens[j] = tokens[j + 2];
+            }
+            numtokens -= 2;
+            break;
+        }
+    }
+}
+
 // Function to execute a command
 void execute_command(token_t **tokens, int numtokens)
 {
@@ -49,7 +79,7 @@ void execute_command(token_t **tokens, int numtokens)
     }
 
     // Terminate the argument list for execve
-    argv[arg_count] = '\0';
+    argv[arg_count] = NULL;
 
     if (arg_count == 0)
     {
@@ -62,6 +92,7 @@ void execute_command(token_t **tokens, int numtokens)
     pid_t pid = fork();
     if (pid == 0)
     {
+        redirect(tokens, numtokens);
         // Child process: execute the command
         if (execvp(argv[0], argv) == -1)
         {
