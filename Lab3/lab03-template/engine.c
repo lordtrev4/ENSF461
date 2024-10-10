@@ -4,6 +4,17 @@
 #include <assert.h>
 #include <sys/wait.h>
 #include "parser.h"
+#include <string.h>
+
+#define MAX_VARIABLES 1000  // Define a maximum number of variables
+
+typedef struct {
+    char *name;
+    char *value;
+} variable_t;
+
+variable_t variables[MAX_VARIABLES];  // Array of variables
+int variable_count = 0;  // Count of variables
 
 int read_line(int infile, char *buffer, int maxlen)
 {
@@ -113,13 +124,31 @@ void execute_command(token_t **tokens, int numtokens)
 }
 
 void update_variable(char *name, char *value)
+// update or create a variable
 {
-    // Update or create a variable
+    // Check if variable already exists and update it
+    for (int i = 0; i < variable_count; i++) {
+        if (strcmp(variables[i].name, name) == 0) {
+            free(variables[i].value);
+            variables[i].value = strdup(value);
+            return;
+        }
+    }
+    
+    // If not found, add new variable
+    variables[variable_count].name = strdup(name);
+    variables[variable_count].value = strdup(value);
+    variable_count++;
 }
 
 char *lookup_variable(char *name)
 {
     // Lookup a variable
+    for (int i = 0; i < variable_count; i++) {
+        if (strcmp(variables[i].name, name) == 0) {
+            return variables[i].value;
+        }
+    }   
     return NULL;
 }
 
@@ -180,6 +209,24 @@ int main(int argc, char *argv[])
         // * Handle pipes
         // * Handle variable assignments
         // TODO
+        if (strchr(buffer, '=') != NULL) {
+            // Handle variable assignment
+            char *name = strtok(buffer, " =");
+            char *value = strtok(NULL, "\n"); // Get the rest of the line as value
+            update_variable(name, value);
+            continue; // Skip executing this line
+        }
+
+        for (int i = 0; i < numtokens; i++) {
+            if (tokens[i]->type == TOKEN_VAR && tokens[i]->value[0] == '$') {
+                char *var_name = tokens[i]->value + 1; // Skip the '$'
+                char *var_value = lookup_variable(var_name);
+                if (var_value != NULL) {
+                    free(tokens[i]->value);
+                    tokens[i]->value = strdup(var_value); // Replace with the variable's value
+                }
+            }
+        }
 
         // Execute the command
         execute_command(tokens, numtokens);
