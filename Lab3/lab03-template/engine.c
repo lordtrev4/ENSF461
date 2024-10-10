@@ -81,14 +81,16 @@ void pipe_command(token_t **left_tokens, int left_numtokens, token_t **right_tok
         close(pipe_fd[0]);
         close(pipe_fd[1]);
 
-        char *argv[64];
+        char *argv1[64];
+        int arg_count1 = 0;
         for (int i = 0; i < left_numtokens; i++)
         {
-            argv[i] = left_tokens[i]->value;
+            argv1[arg_count1] = left_tokens[i]->value;
+            arg_count1++;
         }
-        argv[left_numtokens] = NULL;
+        argv1[left_numtokens] = NULL;
 
-        if (execvp(argv[0], argv) == -1)
+        if (execvp(argv1[0], argv1) == -1)
         {
             perror("Error: execvp failed for left command");
             exit(EXIT_FAILURE);
@@ -101,18 +103,18 @@ void pipe_command(token_t **left_tokens, int left_numtokens, token_t **right_tok
         close(pipe_fd[0]);
         close(pipe_fd[1]);
 
-        redirect(right_tokens, right_numtokens);
-
-        char *argv[64];
-        int arg_count = 0;
+        char *argv2[64];
+        int arg_count2 = 0;
         for (int i = 0; i < right_numtokens; i++)
         {
-            argv[arg_count] = right_tokens[i]->value;
-            arg_count++;
+            argv2[arg_count2] = right_tokens[i]->value;
+            arg_count2++;
         }
-        argv[right_numtokens] = NULL;
 
-        if (execvp(argv[0], argv) == -1)
+        argv2[right_numtokens] = NULL;
+
+        redirect(right_tokens, right_numtokens);
+        if (execvp(argv2[0], argv2) == -1)
         {
             perror("Error: execvp failed for right command");
             exit(EXIT_FAILURE);
