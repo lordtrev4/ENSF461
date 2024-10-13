@@ -156,6 +156,27 @@ void policy_FIFO()
     printf("End of execution with FIFO.\n");
 }
 
+void policy_analysis(char *pname)
+{
+    int total_response_time = 0;
+    int total_turnaround_time = 0;
+    int total_wait_time = 0;
+    struct job *current = head;
+
+    printf("Begin analyzing %s:\n", pname);
+    while (current != NULL)
+    {
+        total_response_time += current->start - current->arrival;
+        total_turnaround_time += current->completion - current->arrival;
+        total_wait_time += current->wait;
+        printf("Job %d -- Response time: %d  Turnaround: %d  Wait: %d\n", current->id, current->start - current->arrival, current->completion - current->arrival, current->wait);
+
+        current = current->next;
+    }
+    printf("Average -- Response: %.2f  Turnaround %.2f  Wait %.2f\n", (float)total_response_time / numofjobs, (float)total_turnaround_time / numofjobs, (float)total_wait_time / numofjobs);
+    printf("End analyzing %s.\n", pname);
+}
+
 int main(int argc, char **argv)
 {
 
@@ -192,23 +213,7 @@ int main(int argc, char **argv)
         policy_FIFO();
         if (analysis == 1)
         {
-            int total_response_time = 0;
-            int total_turnaround_time = 0;
-            int total_wait_time = 0;
-            struct job *current = head;
-
-            printf("Begin analyzing FIFO:\n");
-            while (current != NULL)
-            {
-                total_response_time += current->start - current->arrival;
-                total_turnaround_time += current->completion - current->arrival;
-                total_wait_time += current->wait;
-                printf("Job %d -- Response time: %d  Turnaround: %d  Wait: %d\n", current->id, current->start - current->arrival, current->completion - current->arrival, current->wait);
-
-                current = current->next;
-            }
-            printf("Average -- Response: %.2f  Turnaround %.2f  Wait %.2f\n", (float)total_response_time / numofjobs, (float)total_turnaround_time / numofjobs, (float)total_wait_time / numofjobs);
-            printf("End analyzing FIFO.\n");
+            policy_analysis(pname);
         }
     }
     else if (strcmp(pname, "SJF") == 0)
