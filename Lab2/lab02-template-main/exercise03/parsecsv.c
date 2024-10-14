@@ -12,7 +12,7 @@ void write_list_to_file(record_t* head, const char* filename) {
     }
     record_t* current = head;
     while (current != NULL) {
-        fprintf(fout, "%.2f,%.2f\n", current->avg, current->sdv);
+        fprintf(fout, "%.5f,%.5f\n", current->avg, current->sdv);
         current = current->next;
     }
     fclose(fout);
