@@ -218,7 +218,11 @@ int main(int argc, char **argv)
     }
     else if (strcmp(pname, "SJF") == 0)
     {
-        // TODO
+        policy_SJF();
+        if (analysis == 1)
+        {
+            policy_analysis(pname);
+        }    
     }
     else if (strcmp(pname, "STCF") == 0)
     {
