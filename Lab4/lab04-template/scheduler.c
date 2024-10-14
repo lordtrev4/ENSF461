@@ -89,8 +89,58 @@ void read_job_config(const char *filename)
 void policy_SJF()
 {
     printf("Execution trace with SJF:\n");
+    
+    struct job *current = head;
+    int time = 0;
 
-    // TODO: implement SJF policy
+    while (1) {
+        // Find the job that is ready to run
+        struct job *shortest_job = NULL;
+        struct job *prev_shortest = NULL;
+        struct job *iter = head;
+
+        while (iter != NULL) {
+            if (iter->arrival <= time && (shortest_job == NULL || iter->length < shortest_job->length || 
+               (iter->length == shortest_job->length && iter->id < shortest_job->id))) {
+                shortest_job = iter;
+                prev_shortest = NULL;  // Track the previous node for removal if necessary
+            }
+            iter = iter->next;
+        }
+
+        if (shortest_job == NULL) {
+            // No job is ready to run; break if all jobs have completed
+            if (current == NULL) {
+                break; // All jobs completed, exit the loop
+            } else {
+                // CPU is idle; move time forward to the next job's arrival
+                time = (current == NULL) ? INT_MAX : current->arrival;
+                continue;
+            }
+        }
+
+        // If we found a job to run, print its execution details
+        printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n", time, shortest_job->id, shortest_job->arrival, shortest_job->length);
+        shortest_job->start = time; // start time
+        time += shortest_job->length; // advance time
+        shortest_job->completion = time; // completion time
+        shortest_job->wait = shortest_job->start - shortest_job->arrival; // wait time
+
+        // Remove the job from the list (optional based on your structure)
+        // You can also just set current to NULL if you're maintaining a list of completed jobs.
+        if (head == shortest_job) {
+            head = shortest_job->next; // Remove from the head
+        } else {
+            iter = head;
+            while (iter != NULL && iter->next != shortest_job) {
+                iter = iter->next; // Traverse to the job before shortest_job
+            }
+            if (iter != NULL) {
+                iter->next = shortest_job->next; // Unlink shortest_job from the list
+            }
+        }
+    }
+
 
     printf("End of execution with SJF.\n");
 }
