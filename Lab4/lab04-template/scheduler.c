@@ -87,66 +87,64 @@ void read_job_config(const char *filename)
         free(line);
 }
 
-void policy_SJF()
-{
+void policy_SJF() {
     printf("Execution trace with SJF:\n");
-     
-    struct job *current = head;
+
     int time = 0;
 
     while (1) {
-        // Find the job that is ready to run
         struct job *shortest_job = NULL;
-        struct job *iter = head;
+        struct job *current = head;
 
-        while (iter != NULL) {
-            if (iter->arrival <= time && (shortest_job == NULL || 
-                iter->length < shortest_job->length || 
-               (iter->length == shortest_job->length && iter->id < shortest_job->id))) {
-                shortest_job = iter;
+        // Find the shortest job that is ready to run
+        while (current != NULL) {
+            if (current->arrival <= time && 
+                (shortest_job == NULL || current->length < shortest_job->length || 
+                (current->length == shortest_job->length && current->id < shortest_job->id))) {
+                shortest_job = current;
             }
-            iter = iter->next;
+            current = current->next;
         }
 
         if (shortest_job == NULL) {
-            // No job is ready to run; break if all jobs have completed
-            if (head == NULL) {
-                break; // All jobs completed, exit the loop
-            } else {
-                // CPU is idle; move time forward to the next job's arrival
-                time++;
-                continue;
+            // All jobs are completed, or no job is ready; find the next job arrival
+            if (head == NULL) break; // All jobs completed
+
+            // Increment time to the next job's arrival
+            time = INT_MAX; // Reset to find the minimum arrival time
+            current = head;
+            while (current != NULL) {
+                if (current->arrival > time) {
+                    time = current->arrival;
+                }
+                current = current->next;
             }
+            continue;
         }
 
-        // If we found a job to run, print its execution details
+        // Run the shortest job
         printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n", time, shortest_job->id, shortest_job->arrival, shortest_job->length);
-        shortest_job->start = time; // Set start time
-        time += shortest_job->length; // Advance time by job length
-        shortest_job->completion = time; // Set completion time
-        shortest_job->wait = shortest_job->start - shortest_job->arrival; // Calculate wait time
+        shortest_job->start = time;
+        time += shortest_job->length;
+        shortest_job->completion = time;
+        shortest_job->wait = shortest_job->start - shortest_job->arrival;
 
         // Remove the job from the list
-        // if (head == shortest_job) {
-        //     head = shortest_job->next; // If the shortest job is the head, update head
-        // } else {
-        //     iter = head;
-        //     while (iter != NULL && iter->next != shortest_job) {
-        //         iter = iter->next; // Traverse to the job before the shortest job
-        //     }
-        //     if (iter != NULL) {
-        //         iter->next = shortest_job->next; // Unlink shortest job from the list
-        //     }
-        // }
-
-        // Free the completed job's memory (optional, depending on your cleanup needs)
-        // free(shortest_job);
-        shortest_job->completion = 1;
-
+        if (head == shortest_job) {
+            head = shortest_job->next;
+        } else {
+            current = head;
+            while (current->next != shortest_job) {
+                current = current->next;
+            }
+            current->next = shortest_job->next;
+        }
+        free(shortest_job); // Free memory of the completed job
     }
 
     printf("End of execution with SJF.\n");
 }
+
 
 void policy_STCF()
 {
@@ -219,7 +217,7 @@ void policy_analysis(char *pname)
     printf("Begin analyzing %s:\n", pname);
     while (current != NULL)
     {
-        if (current->completion == 1) { // Analyze only completed jobs
+        if (current->completion > 0) { // Analyze only completed jobs
             int response_time = current->start - current->arrival;
             int turnaround_time = current->completion - current->arrival;
             int wait_time = current->wait;
