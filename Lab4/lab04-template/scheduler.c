@@ -111,13 +111,15 @@ void policy_SJF() {
             if (head == NULL) break; // All jobs completed
 
             // Increment time to the next job's arrival
-            time = INT_MAX; // Reset to find the minimum arrival time
+            int next_arrival = INT_MAX;
             current = head;
-            while (current != NULL) {
-                if (current->arrival > time) {
-                    time = current->arrival;
+            while (current != NULL) 
+            {
+                if (current->arrival > time) 
+                {
+                    next_arrival = min(next_arrival, current->arrival);
                 }
-                current = current->next;
+            time = next_arrival; // Move time to the next arrival
             }
             continue;
         }
@@ -128,6 +130,7 @@ void policy_SJF() {
         time += shortest_job->length;
         shortest_job->completion = time;
         shortest_job->wait = shortest_job->start - shortest_job->arrival;
+        printf()
 
         // Remove the job from the list
         if (head == shortest_job) {
@@ -139,7 +142,7 @@ void policy_SJF() {
             }
             current->next = shortest_job->next;
         }
-        free(shortest_job); // Free memory of the completed job
+        // free(shortest_job); // Free memory of the completed job
     }
 
     printf("End of execution with SJF.\n");
@@ -217,7 +220,7 @@ void policy_analysis(char *pname)
     printf("Begin analyzing %s:\n", pname);
     while (current != NULL)
     {
-        if (current->completion > 0) { // Analyze only completed jobs
+         // Analyze only completed jobs
             int response_time = current->start - current->arrival;
             int turnaround_time = current->completion - current->arrival;
             int wait_time = current->wait;
@@ -227,7 +230,7 @@ void policy_analysis(char *pname)
             total_wait_time += wait_time;
 
             printf("Job %d -- Response time: %d  Turnaround: %d  Wait: %d\n", current->id, response_time, turnaround_time, wait_time);
-        }
+        
 
         current = current->next;
     }
