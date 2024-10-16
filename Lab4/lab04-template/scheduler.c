@@ -120,7 +120,7 @@ void policy_SJF()
                 break; // All jobs completed
 
             // Increment time to the next job's arrival
-            time = INT_MAX; // Reset to find the minimum arrival time
+            int next_arrival = INT_MAX;
             current = head;
             while (current != NULL)
             {
@@ -128,7 +128,7 @@ void policy_SJF()
                 {
                     time = current->arrival;
                 }
-                current = current->next;
+            time = next_arrival; // Move time to the next arrival
             }
             continue;
         }
@@ -139,6 +139,7 @@ void policy_SJF()
         time += shortest_job->length;
         shortest_job->completion = time;
         shortest_job->wait = shortest_job->start - shortest_job->arrival;
+        printf()
 
         // Remove the job from the list
         if (head == shortest_job)
@@ -154,7 +155,7 @@ void policy_SJF()
             }
             current->next = shortest_job->next;
         }
-        free(shortest_job); // Free memory of the completed job
+        // free(shortest_job); // Free memory of the completed job
     }
 
     printf("End of execution with SJF.\n");
