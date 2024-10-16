@@ -5,6 +5,7 @@
 #include <string.h>
 #include <limits.h>
 #include <time.h>
+#include <stdbool.h>
 
 #define min(a, b) (((a) < (b)) ? (a) : (b))
 
@@ -17,11 +18,13 @@ struct job
     int id;
     int arrival; // arrival time; safely assume the time unit has the minimal increment of 1
     int length;
-    int tickets;    // number of tickets for lottery scheduling
-    int start;      // start time
-    int completion; // completion time
-    int wait;       // wait time
+    int initial_length; // initial length of the job
+    int tickets;        // number of tickets for lottery scheduling
+    int start;          // start time
+    int completion;     // completion time
+    int wait;           // wait time
     struct job *next;
+    bool jobDone;
 };
 
 // the workload list
@@ -189,7 +192,115 @@ void policy_LT(int slice)
     // int winning_ticket = rand() % total_tickets;
     // And pick the winning job using the linked list approach discussed in class, or equivalent
 
+    struct job *current;
+    int time = 0;
+    int total_tickets = 0;
+    int active_jobs = 0;
+
+    // Initialize all jobs
+    current = head;
+    while (current != NULL)
+    {
+        current->jobDone = false;
+        current->start = -1;
+        current->initial_length = current->length;
+        current = current->next;
+    }
+
+    // Main scheduling loop
+    while (1)
+    {
+        // Update active jobs and total tickets
+        active_jobs = 0;
+        total_tickets = 0;
+        current = head;
+        while (current != NULL)
+        {
+            if (!current->jobDone && current->arrival <= time)
+            {
+                active_jobs++;
+                total_tickets += current->tickets;
+            }
+            current = current->next;
+        }
+
+        if (active_jobs == 0)
+        {
+            // If no active jobs, advance time to next job arrival
+            int next_arrival = INT_MAX;
+            current = head;
+            while (current != NULL)
+            {
+                if (!current->jobDone && current->arrival > time && current->arrival < next_arrival)
+                {
+                    next_arrival = current->arrival;
+                }
+                current = current->next;
+            }
+            if (next_arrival == INT_MAX)
+                break; // All jobs completed
+            time = next_arrival;
+            continue;
+        }
+
+        // Select a job using lottery scheduling
+        int winning_ticket = rand() % total_tickets;
+        int ticket_counter = 0;
+        struct job *winner = NULL;
+        current = head;
+
+        while (current != NULL)
+        {
+            if (!current->jobDone && current->arrival <= time)
+            {
+                ticket_counter += current->tickets;
+                if (ticket_counter > winning_ticket)
+                {
+                    winner = current;
+                    break;
+                }
+            }
+            current = current->next;
+        }
+
+        if (winner == NULL)
+            continue; // Should never happen, but just in case
+
+        // Run the winning job
+        int run_ticks = slice;
+        if (winner->length < run_ticks)
+        {
+            run_ticks = winner->length;
+        }
+
+        printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n", time, winner->id, winner->arrival, run_ticks);
+
+        // Set the start time if this is the first time the job is running
+        if (winner->start == -1)
+        {
+            winner->start = time;
+        }
+
+        time += run_ticks;
+        winner->length -= run_ticks;
+
+        // Check if job is completed
+        if (winner->length == 0)
+        {
+            winner->completion = time;
+            winner->jobDone = true;
+        }
+    }
+
     printf("End of execution with LT.\n");
+
+    // Calculate wait times
+    current = head;
+    while (current != NULL)
+    {
+        current->wait = current->completion - current->arrival - current->initial_length;
+        current = current->next;
+    }
 }
 
 void policy_FIFO()
@@ -292,7 +403,11 @@ int main(int argc, char **argv)
     }
     else if (strcmp(pname, "LT") == 0)
     {
-        // TODO
+        policy_LT(slice);
+        if (analysis == 1)
+        {
+            policy_analysis(pname);
+        }
     }
 
     exit(0);
