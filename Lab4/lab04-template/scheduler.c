@@ -128,7 +128,7 @@ void policy_SJF()
                 {
                     time = current->arrival;
                 }
-            time = next_arrival; // Move time to the next arrival
+                time = next_arrival; // Move time to the next arrival
             }
             continue;
         }
@@ -141,8 +141,8 @@ void policy_SJF()
         shortest_job->wait = shortest_job->start - shortest_job->arrival;
         printf()
 
-        // Remove the job from the list
-        if (head == shortest_job)
+            // Remove the job from the list
+            if (head == shortest_job)
         {
             head = shortest_job->next;
         }
