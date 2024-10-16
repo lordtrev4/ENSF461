@@ -87,34 +87,42 @@ void read_job_config(const char *filename)
         free(line);
 }
 
-void policy_SJF() {
+void policy_SJF()
+{
     printf("Execution trace with SJF:\n");
 
     int time = 0;
 
-    while (1) {
+    while (1)
+    {
         struct job *shortest_job = NULL;
         struct job *current = head;
 
         // Find the shortest job that is ready to run
-        while (current != NULL) {
-            if (current->arrival <= time && 
-                (shortest_job == NULL || current->length < shortest_job->length || 
-                (current->length == shortest_job->length && current->id < shortest_job->id))) {
+        while (current != NULL)
+        {
+            if (current->arrival <= time &&
+                (shortest_job == NULL || current->length < shortest_job->length ||
+                 (current->length == shortest_job->length && current->id < shortest_job->id)))
+            {
                 shortest_job = current;
             }
             current = current->next;
         }
 
-        if (shortest_job == NULL) {
+        if (shortest_job == NULL)
+        {
             // All jobs are completed, or no job is ready; find the next job arrival
-            if (head == NULL) break; // All jobs completed
+            if (head == NULL)
+                break; // All jobs completed
 
             // Increment time to the next job's arrival
             time = INT_MAX; // Reset to find the minimum arrival time
             current = head;
-            while (current != NULL) {
-                if (current->arrival > time) {
+            while (current != NULL)
+            {
+                if (current->arrival > time)
+                {
                     time = current->arrival;
                 }
                 current = current->next;
@@ -130,11 +138,15 @@ void policy_SJF() {
         shortest_job->wait = shortest_job->start - shortest_job->arrival;
 
         // Remove the job from the list
-        if (head == shortest_job) {
+        if (head == shortest_job)
+        {
             head = shortest_job->next;
-        } else {
+        }
+        else
+        {
             current = head;
-            while (current->next != shortest_job) {
+            while (current->next != shortest_job)
+            {
                 current = current->next;
             }
             current->next = shortest_job->next;
@@ -144,7 +156,6 @@ void policy_SJF() {
 
     printf("End of execution with SJF.\n");
 }
-
 
 void policy_STCF()
 {
@@ -158,8 +169,6 @@ void policy_STCF()
 void policy_RR(int slice)
 {
     printf("Execution trace with RR:\n");
-
-    // TODO: implement RR policy
 
     printf("End of execution with RR.\n");
 }
@@ -213,29 +222,16 @@ void policy_analysis(char *pname)
     int total_turnaround_time = 0;
     int total_wait_time = 0;
     struct job *current = head;
-
     printf("Begin analyzing %s:\n", pname);
     while (current != NULL)
     {
-        if (current->completion > 0) { // Analyze only completed jobs
-            int response_time = current->start - current->arrival;
-            int turnaround_time = current->completion - current->arrival;
-            int wait_time = current->wait;
-
-            total_response_time += response_time;
-            total_turnaround_time += turnaround_time;
-            total_wait_time += wait_time;
-
-            printf("Job %d -- Response time: %d  Turnaround: %d  Wait: %d\n", current->id, response_time, turnaround_time, wait_time);
-        }
-
+        total_response_time += current->start - current->arrival;
+        total_turnaround_time += current->completion - current->arrival;
+        total_wait_time += current->wait;
+        printf("Job %d -- Response time: %d  Turnaround: %d  Wait: %d\n", current->id, current->start - current->arrival, current->completion - current->arrival, current->wait);
         current = current->next;
     }
-
-    printf("Average -- Response: %.2f  Turnaround %.2f  Wait %.2f\n", 
-        (float)total_response_time / numofjobs, 
-        (float)total_turnaround_time / numofjobs, 
-        (float)total_wait_time / numofjobs);
+    printf("Average -- Response: %.2f  Turnaround %.2f  Wait %.2f\n", (float)total_response_time / numofjobs, (float)total_turnaround_time / numofjobs, (float)total_wait_time / numofjobs);
     printf("End analyzing %s.\n", pname);
 }
 
@@ -284,7 +280,7 @@ int main(int argc, char **argv)
         if (analysis == 1)
         {
             policy_analysis(pname);
-        }    
+        }
     }
     else if (strcmp(pname, "STCF") == 0)
     {
