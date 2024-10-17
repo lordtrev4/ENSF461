@@ -68,12 +68,10 @@ void read_job_config(const char *filename)
     char *arrival = NULL;
     char *length = NULL;
 
-    // TODO, error checking
     fp = fopen(filename, "r");
     if (fp == NULL)
         exit(EXIT_FAILURE);
 
-    // TODO: if the file is empty, we should just exit with error
     while ((read = getline(&line, &len, fp)) != -1)
     {
         if (line[read - 1] == '\n')
@@ -103,7 +101,6 @@ void policy_SJF()
         struct job *shortest_job = NULL;
         struct job *current = remaining;
 
-        // Find the shortest job among arrived jobs
         while (current != NULL)
         {
             if (current->arrival <= time && !current->jobDone &&
@@ -115,7 +112,6 @@ void policy_SJF()
             current = current->next;
         }
 
-        // If no job is ready, advance time to next arrival
         if (shortest_job == NULL)
         {
             int next_arrival = INT_MAX;
@@ -132,7 +128,6 @@ void policy_SJF()
             continue;
         }
 
-        // Run the shortest job
         printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n",
                time, shortest_job->id, shortest_job->arrival, shortest_job->length);
 
@@ -155,7 +150,6 @@ void policy_STCF()
     struct job *remaining = head;
     int jobs_remaining = numofjobs;
 
-    // Initialize all jobs
     struct job *current = head;
     while (current != NULL)
     {
@@ -170,7 +164,6 @@ void policy_STCF()
         struct job *shortest_job = NULL;
         current = remaining;
 
-        // Find the job with the shortest remaining time among arrived jobs
         while (current != NULL)
         {
             if (current->arrival <= time && !current->jobDone &&
@@ -182,7 +175,6 @@ void policy_STCF()
             current = current->next;
         }
 
-        // If no job is ready, advance time to next arrival
         if (shortest_job == NULL)
         {
             int next_arrival = INT_MAX;
@@ -199,7 +191,6 @@ void policy_STCF()
             continue;
         }
 
-        // Determine how long this job can run before the next job arrives or it completes
         int run_time = shortest_job->length;
         current = remaining;
         while (current != NULL)
@@ -211,7 +202,6 @@ void policy_STCF()
             current = current->next;
         }
 
-        // Run the job
         printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n",
                time, shortest_job->id, shortest_job->arrival, run_time);
 
@@ -219,7 +209,7 @@ void policy_STCF()
         {
             shortest_job->start = time;
         }
-        
+
         time += run_time;
         shortest_job->length -= run_time;
 
@@ -233,7 +223,6 @@ void policy_STCF()
 
     printf("End of execution with STCF.\n");
 
-    // Calculate wait times
     current = head;
     while (current != NULL)
     {
@@ -241,10 +230,6 @@ void policy_STCF()
         current = current->next;
     }
 }
-
-
-
-
 
 void policy_RR(int slice)
 {
@@ -366,24 +351,13 @@ void policy_LT(int slice)
 {
     printf("Execution trace with LT:\n");
 
-    // Leave this here, it will ensure the scheduling behavior remains deterministic
     srand(42);
-
-    // In the following, you'll need to:
-    // Figure out which active job to run first
-    // Pick the job with the shortest remaining time
-    // Considers jobs in order of arrival, so implicitly breaks ties by choosing the job with the lowest ID
-
-    // To achieve consistency with the tests, you are encouraged to choose the winning ticket as follows:
-    // int winning_ticket = rand() % total_tickets;
-    // And pick the winning job using the linked list approach discussed in class, or equivalent
 
     struct job *current;
     int time = 0;
     int total_tickets = 0;
     int active_jobs = 0;
 
-    // Initialize all jobs
     current = head;
     while (current != NULL)
     {
@@ -393,10 +367,8 @@ void policy_LT(int slice)
         current = current->next;
     }
 
-    // Main scheduling loop
     while (1)
     {
-        // Update active jobs and total tickets
         active_jobs = 0;
         total_tickets = 0;
         current = head;
@@ -412,7 +384,6 @@ void policy_LT(int slice)
 
         if (active_jobs == 0)
         {
-            // If no active jobs, advance time to next job arrival
             int next_arrival = INT_MAX;
             current = head;
             while (current != NULL)
@@ -424,12 +395,11 @@ void policy_LT(int slice)
                 current = current->next;
             }
             if (next_arrival == INT_MAX)
-                break; // All jobs completed
+                break;
             time = next_arrival;
             continue;
         }
 
-        // Select a job using lottery scheduling
         int winning_ticket = rand() % total_tickets;
         int ticket_counter = 0;
         struct job *winner = NULL;
@@ -450,9 +420,8 @@ void policy_LT(int slice)
         }
 
         if (winner == NULL)
-            continue; // Should never happen, but just in case
+            continue;
 
-        // Run the winning job
         int run_ticks = slice;
         if (winner->length < run_ticks)
         {
@@ -461,7 +430,6 @@ void policy_LT(int slice)
 
         printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n", time, winner->id, winner->arrival, run_ticks);
 
-        // Set the start time if this is the first time the job is running
         if (winner->start == -1)
         {
             winner->start = time;
@@ -470,7 +438,6 @@ void policy_LT(int slice)
         time += run_ticks;
         winner->length -= run_ticks;
 
-        // Check if job is completed
         if (winner->length == 0)
         {
             winner->completion = time;
@@ -480,7 +447,6 @@ void policy_LT(int slice)
 
     printf("End of execution with LT.\n");
 
-    // Calculate wait times
     current = head;
     while (current != NULL)
     {
