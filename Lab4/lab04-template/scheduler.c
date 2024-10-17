@@ -95,16 +95,18 @@ void policy_SJF()
     printf("Execution trace with SJF:\n");
 
     int time = 0;
+    struct job *remaining = head;
+    int jobs_remaining = numofjobs;
 
-    while (1)
+    while (jobs_remaining > 0)
     {
         struct job *shortest_job = NULL;
-        struct job *current = head;
+        struct job *current = remaining;
 
-        // Find the shortest job that is ready to run
+        // Find the shortest job among arrived jobs
         while (current != NULL)
         {
-            if (current->arrival <= time &&
+            if (current->arrival <= time && !current->jobDone &&
                 (shortest_job == NULL || current->length < shortest_job->length ||
                  (current->length == shortest_job->length && current->id < shortest_job->id)))
             {
@@ -113,49 +115,33 @@ void policy_SJF()
             current = current->next;
         }
 
+        // If no job is ready, advance time to next arrival
         if (shortest_job == NULL)
         {
-            // All jobs are completed, or no job is ready; find the next job arrival
-            if (head == NULL)
-                break; // All jobs completed
-
-            // Increment time to the next job's arrival
             int next_arrival = INT_MAX;
-            current = head;
+            current = remaining;
             while (current != NULL)
             {
-                if (current->arrival > time)
+                if (!current->jobDone && current->arrival < next_arrival && current->arrival > time)
                 {
-                    time = current->arrival;
+                    next_arrival = current->arrival;
                 }
-                time = next_arrival; // Move time to the next arrival
+                current = current->next;
             }
+            time = next_arrival;
             continue;
         }
 
         // Run the shortest job
-        printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n", time, shortest_job->id, shortest_job->arrival, shortest_job->length);
+        printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n",
+               time, shortest_job->id, shortest_job->arrival, shortest_job->length);
+
         shortest_job->start = time;
         time += shortest_job->length;
         shortest_job->completion = time;
         shortest_job->wait = shortest_job->start - shortest_job->arrival;
-        printf()
-
-            // Remove the job from the list
-            if (head == shortest_job)
-        {
-            head = shortest_job->next;
-        }
-        else
-        {
-            current = head;
-            while (current->next != shortest_job)
-            {
-                current = current->next;
-            }
-            current->next = shortest_job->next;
-        }
-        // free(shortest_job); // Free memory of the completed job
+        shortest_job->jobDone = true;
+        jobs_remaining--;
     }
 
     printf("End of execution with SJF.\n");
@@ -174,7 +160,116 @@ void policy_RR(int slice)
 {
     printf("Execution trace with RR:\n");
 
+    int time = 0;
+    struct job *ready_queue[100];
+    int front = 0;
+    int rear = 0;
+    int active_jobs = 0;
+
+    struct job *current = head;
+    while (current != NULL)
+    {
+        current->jobDone = false;
+        current->start = -1;
+        current->initial_length = current->length;
+        current = current->next;
+    }
+
+    current = head;
+    while (current != NULL)
+    {
+        if (current->arrival == 0)
+        {
+            ready_queue[rear] = current;
+            rear = (rear + 1) % 100;
+            active_jobs++;
+        }
+        current = current->next;
+    }
+
+    while (active_jobs > 0)
+    {
+        struct job *current_job = ready_queue[front];
+        front = (front + 1) % 100;
+        active_jobs--;
+
+        if (current_job->start == -1)
+        {
+            current_job->start = time;
+        }
+
+        int run_time = min(slice, current_job->length);
+
+        printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n",
+               time, current_job->id, current_job->arrival, run_time);
+
+        time += run_time;
+        current_job->length -= run_time;
+
+        current = head;
+        while (current != NULL)
+        {
+            if (!current->jobDone && current->arrival <= time && current->arrival > (time - run_time))
+            {
+                ready_queue[rear] = current;
+                rear = (rear + 1) % 100;
+                active_jobs++;
+            }
+            current = current->next;
+        }
+
+        if (current_job->length > 0)
+        {
+            ready_queue[rear] = current_job;
+            rear = (rear + 1) % 100;
+            active_jobs++;
+        }
+        else
+        {
+            current_job->completion = time;
+            current_job->jobDone = true;
+        }
+
+        if (active_jobs == 0)
+        {
+            bool continue_execution = false;
+            int next_arrival = INT_MAX;
+            current = head;
+            while (current != NULL)
+            {
+                if (!current->jobDone && current->arrival > time && current->arrival < next_arrival)
+                {
+                    continue_execution = true;
+                    next_arrival = current->arrival;
+                }
+                current = current->next;
+            }
+            if (continue_execution)
+            {
+                time = next_arrival;
+                current = head;
+                while (current != NULL)
+                {
+                    if (!current->jobDone && current->arrival == next_arrival)
+                    {
+                        ready_queue[rear] = current;
+                        rear = (rear + 1) % 100;
+                        active_jobs++;
+                    }
+                    current = current->next;
+                }
+            }
+        }
+    }
+
     printf("End of execution with RR.\n");
+
+    current = head;
+    while (current != NULL)
+    {
+        current->wait = current->completion - current->arrival - current->initial_length;
+        current = current->next;
+    }
 }
 
 void policy_LT(int slice)
@@ -400,7 +495,11 @@ int main(int argc, char **argv)
     }
     else if (strcmp(pname, "RR") == 0)
     {
-        // TODO
+        policy_RR(slice);
+        if (analysis == 1)
+        {
+            policy_analysis(pname);
+        }
     }
     else if (strcmp(pname, "LT") == 0)
     {
