@@ -151,10 +151,100 @@ void policy_STCF()
 {
     printf("Execution trace with STCF:\n");
 
-    // TODO: implement STCF policy
+    int time = 0;
+    struct job *remaining = head;
+    int jobs_remaining = numofjobs;
+
+    // Initialize all jobs
+    struct job *current = head;
+    while (current != NULL)
+    {
+        current->jobDone = false;
+        current->start = -1;
+        current->initial_length = current->length;
+        current = current->next;
+    }
+
+    while (jobs_remaining > 0)
+    {
+        struct job *shortest_job = NULL;
+        current = remaining;
+
+        // Find the job with the shortest remaining time among arrived jobs
+        while (current != NULL)
+        {
+            if (current->arrival <= time && !current->jobDone &&
+                (shortest_job == NULL || current->length < shortest_job->length ||
+                 (current->length == shortest_job->length && current->id < shortest_job->id)))
+            {
+                shortest_job = current;
+            }
+            current = current->next;
+        }
+
+        // If no job is ready, advance time to next arrival
+        if (shortest_job == NULL)
+        {
+            int next_arrival = INT_MAX;
+            current = remaining;
+            while (current != NULL)
+            {
+                if (!current->jobDone && current->arrival < next_arrival && current->arrival > time)
+                {
+                    next_arrival = current->arrival;
+                }
+                current = current->next;
+            }
+            time = next_arrival;
+            continue;
+        }
+
+        // Determine how long this job can run before the next job arrives or it completes
+        int run_time = shortest_job->length;
+        current = remaining;
+        while (current != NULL)
+        {
+            if (!current->jobDone && current->arrival > time && current->arrival < time + run_time)
+            {
+                run_time = current->arrival - time;
+            }
+            current = current->next;
+        }
+
+        // Run the job
+        printf("t=%d: [Job %d] arrived at [%d], ran for: [%d]\n",
+               time, shortest_job->id, shortest_job->arrival, run_time);
+
+        if (shortest_job->start == -1)
+        {
+            shortest_job->start = time;
+        }
+        
+        time += run_time;
+        shortest_job->length -= run_time;
+
+        if (shortest_job->length == 0)
+        {
+            shortest_job->completion = time;
+            shortest_job->jobDone = true;
+            jobs_remaining--;
+        }
+    }
 
     printf("End of execution with STCF.\n");
+
+    // Calculate wait times
+    current = head;
+    while (current != NULL)
+    {
+        current->wait = current->completion - current->arrival - current->initial_length;
+        current = current->next;
+    }
 }
+
+
+
+
 
 void policy_RR(int slice)
 {
@@ -491,7 +581,11 @@ int main(int argc, char **argv)
     }
     else if (strcmp(pname, "STCF") == 0)
     {
-        // TODO
+        policy_STCF();
+        if (analysis == 1)
+        {
+            policy_analysis(pname);
+        }
     }
     else if (strcmp(pname, "RR") == 0)
     {
