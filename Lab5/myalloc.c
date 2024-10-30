@@ -82,12 +82,18 @@ int mydestroy() {
 }
 
 void* myalloc(size_t size) {
-    if (size <= 0 || _arena_start == NULL) {
+    if (_arena_start == NULL) {  // Check for uninitialized arena
+        statusno = ERR_UNINITIALIZED;
+        return NULL;
+    }
+
+    if (size <= 0) {  // Check for invalid size
         statusno = ERR_BAD_ARGUMENTS;
         return NULL;
     }
 
     node_t *current = free_list;
+    printf("Allocating memory:\n...looking for free chunk of >= %zu bytes\n", size);
 
     // Find a free node that fits the requested size
     while (current != NULL && (!(current->is_free) || current->size < size)) {
@@ -99,7 +105,11 @@ void* myalloc(size_t size) {
         return NULL;
     }
 
-    // Split the node if there's excess space
+    printf("...found free chunk of %zu bytes with header at %p\n", current->size, (void*)current);
+    printf("...free chunk->fwd currently points to %p\n", (void*)current->fwd);
+    printf("...free chunk->bwd currently points to %p\n", (void*)current->bwd);
+
+    // Check if we need to split the chunk
     if (current->size >= size + sizeof(node_t) + 1) {
         node_t *new_node = (node_t*)((char*)current + sizeof(node_t) + size);
         new_node->size = current->size - size - sizeof(node_t);
@@ -110,28 +120,46 @@ void* myalloc(size_t size) {
         if (current->fwd) current->fwd->bwd = new_node;
         current->fwd = new_node;
         current->size = size;
+        printf("...splitting required, creating new free chunk with size %zu at %p\n", new_node->size, (void*)new_node);
+    } else {
+        printf("...splitting not required\n");
     }
 
     // Mark current node as allocated
     current->is_free = 0;
     statusno = 0;
-    return (void*)((char*)current + sizeof(node_t));
+
+    void* allocated_memory = (void*)((char*)current + sizeof(node_t));
+    printf("...updating chunk header at %p\n", (void*)current);
+    printf("...allocation starts at %p\n", allocated_memory);
+    return allocated_memory;
 }
 
 void myfree(void *ptr) {
-    if (ptr == NULL || ptr < _arena_start || ptr >= _arena_end) {
+    if (_arena_start == NULL) {  // Check for uninitialized arena
+        statusno = ERR_UNINITIALIZED;
+        return;
+    }
+
+    if (ptr == NULL || ptr < _arena_start || ptr >= _arena_end) {  // Check for invalid pointer
         statusno = ERR_BAD_ARGUMENTS;
         return;
     }
 
+    printf("Freeing allocated memory:\n...supplied pointer %p\n", ptr);
+
+    // Get the chunk header
     node_t *node = (node_t*)((char*)ptr - sizeof(node_t));
     node->is_free = 1;
+    printf("...accessing chunk header at %p\n", (void*)node);
+    printf("...chunk of size %zu\n", node->size);
 
     // Coalesce with forward node if it's free
     if (node->fwd && node->fwd->is_free) {
         node->size += sizeof(node_t) + node->fwd->size;
         node->fwd = node->fwd->fwd;
         if (node->fwd) node->fwd->bwd = node;
+        printf("...coalescing with forward chunk\n");
     }
 
     // Coalesce with backward node if it's free
@@ -139,6 +167,9 @@ void myfree(void *ptr) {
         node->bwd->size += sizeof(node_t) + node->size;
         node->bwd->fwd = node->fwd;
         if (node->fwd) node->fwd->bwd = node->bwd;
+        printf("...coalescing with backward chunk\n");
+    } else {
+        printf("...coalescing not needed\n");
     }
 
     statusno = 0;
