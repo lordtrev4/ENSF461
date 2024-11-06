@@ -158,8 +158,6 @@ void handle_inspection(char** tokens) {
         exit(1);
     }
 
-    timestamp++;
-
     if (strcmp(tokens[0], "pinspect") == 0) {
         uint32_t vpn = atoi(tokens[1]);
         PageTableEntry pte = page_tables[current_pid][vpn];
@@ -171,13 +169,15 @@ void handle_inspection(char** tokens) {
         if (tlb_entry < TLB_SIZE) {
             TLBEntry entry = tlb[tlb_entry];
             fprintf(output_file, "Current PID: %u. Inspected TLB entry %u. VPN: %u. PFN: %u. Valid: %d. PID: %u. Timestamp: %u\n",
-                    current_pid, tlb_entry, entry.vpn, entry.pfn, entry.valid, entry.pid, entry.timestamp);
+                    current_pid, tlb_entry, entry.vpn, entry.pfn, entry.valid, entry.pid, entry.timestamp+1);
         }
+        timestamp++;  // Increment after inspection
     }
     else if (strcmp(tokens[0], "linspect") == 0) {
         uint32_t physical_loc = atoi(tokens[1]);
         fprintf(output_file, "Current PID: %u. Inspected physical location %u. Value: %u\n",
                 current_pid, physical_loc, physical_memory[physical_loc]);
+        timestamp++;  // Increment after inspection
     }
     else if (strcmp(tokens[0], "rinspect") == 0) {
         if (strcmp(tokens[1], "r1") == 0) {
@@ -192,8 +192,10 @@ void handle_inspection(char** tokens) {
             fprintf(output_file, "Current PID: %u. Error: invalid register operand %s\n", current_pid, tokens[1]);
             exit(1);
         }
+        timestamp++;  // Increment after inspection
     }
 }
+
 void handle_ctxswitch(char** tokens) {
     if (!defined) {
         fprintf(output_file, "Current PID: %u. Error: attempt to execute instruction before define\n", current_pid);
@@ -208,8 +210,8 @@ void handle_ctxswitch(char** tokens) {
     }
 
     current_pid = new_pid;
+    timestamp++;  // Increment after context switch
     fprintf(output_file, "Current PID: %u. Switched execution context to process: %u\n", current_pid, current_pid);
-    timestamp++;
 }
 
 void handle_instruction(char** tokens) {
@@ -217,8 +219,6 @@ void handle_instruction(char** tokens) {
         fprintf(output_file, "Current PID: %u. Error: attempt to execute instruction before define\n", current_pid);
         exit(1);
     }
-
-    timestamp++;
 
     if (strcmp(tokens[0], "load") == 0) {
         // Validate register
@@ -235,6 +235,7 @@ void handle_instruction(char** tokens) {
         }
         else {  // Memory location
             uint32_t virtual_addr = atoi(tokens[2]);
+            timestamp++;  // Increment before translation
             uint32_t physical_addr = translate_address(virtual_addr);
             value = physical_memory[physical_addr];
             fprintf(output_file, "Current PID: %u. Loaded value of location %u (%u) into register %s\n",
@@ -250,6 +251,7 @@ void handle_instruction(char** tokens) {
     }
     else if (strcmp(tokens[0], "store") == 0) {
         uint32_t virtual_addr = atoi(tokens[1]);
+        timestamp++;  // Increment before translation
         uint32_t physical_addr = translate_address(virtual_addr);
         uint32_t value;
 
@@ -276,6 +278,7 @@ void handle_instruction(char** tokens) {
         physical_memory[physical_addr] = value;
     }
     else if (strcmp(tokens[0], "add") == 0) {
+        timestamp++;  // Increment for add operation
         uint32_t result = process_registers[current_pid].r1 + process_registers[current_pid].r2;
         fprintf(output_file, "Current PID: %u. Added contents of registers r1 (%u) and r2 (%u). Result: %u\n",
                 current_pid, process_registers[current_pid].r1, process_registers[current_pid].r2, result);
@@ -283,18 +286,19 @@ void handle_instruction(char** tokens) {
     }
 }
 
+
 uint32_t translate_address(uint32_t virtual_addr) {
     uint32_t vpn = extract_vpn(virtual_addr);
     uint32_t offset = extract_offset(virtual_addr);
     uint32_t pfn;
     int tlb_hit = FALSE;
-    int tlb_index = -1;
+    // int tlb_index = -1;
 
     // Check TLB first
     for (int i = 0; i < TLB_SIZE; i++) {
         if (tlb[i].valid && tlb[i].vpn == vpn && tlb[i].pid == current_pid) {
             tlb_hit = TRUE;
-            tlb_index = i;
+            // tlb_index = i;
             pfn = tlb[i].pfn;
 
             // Update timestamp for LRU if needed
@@ -403,6 +407,8 @@ void map_page(uint32_t vpn, uint32_t pfn) {
         }
     }
 
+    timestamp++;  // Increment timestamp for map operation
+    
     // Insert the VPN to PFN mapping in the TLB
     tlb[insert_index].vpn = vpn;
     tlb[insert_index].pfn = pfn;
