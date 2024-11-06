@@ -37,6 +37,8 @@ PageTableEntry** page_tables;
 ProcessRegisters process_registers[MAX_PROCESSES];
 uint32_t current_pid;
 uint32_t timestamp;
+int physical_frame_counter = 0;
+
 
 // Memory configuration
 uint32_t offset_bits;
@@ -80,53 +82,6 @@ char** tokenize_input(char* input) {
     return tokens;
 }
 
-void initialize_memory() {
-    // Initialize physical memory
-    page_size = 1 << offset_bits;
-    num_frames = 1 << pfn_bits;
-    num_pages = 1 << vpn_bits;
-    physical_memory = calloc((1 << (offset_bits + pfn_bits)), sizeof(uint32_t));
-
-    // Initialize page tables for all processes
-    page_tables = malloc(MAX_PROCESSES * sizeof(PageTableEntry*));
-    for (int i = 0; i < MAX_PROCESSES; i++) {
-        page_tables[i] = malloc(num_pages * sizeof(PageTableEntry));
-        for (uint32_t j = 0; j < num_pages; j++) {
-            page_tables[i][j].valid = FALSE;
-        }
-    }
-
-    // Initialize TLB
-    for (int i = 0; i < TLB_SIZE; i++) {
-        tlb[i].valid = FALSE;
-    }
-
-    // Initialize process registers
-    for (int i = 0; i < MAX_PROCESSES; i++) {
-        process_registers[i].r1 = 0;
-        process_registers[i].r2 = 0;
-    }
-
-    current_pid = 0;
-    timestamp = 0;
-    defined = TRUE;
-}
-
-void handle_define(char** tokens) {
-    if (defined) {
-        fprintf(output_file, "Current PID: %u. Error: multiple calls to define in the same trace\n", current_pid);
-        exit(1);
-    }
-
-    offset_bits = atoi(tokens[1]);
-    pfn_bits = atoi(tokens[2]);
-    vpn_bits = atoi(tokens[3]);
-
-    initialize_memory();
-
-    fprintf(output_file, "Current PID: %u. Memory instantiation complete. OFF bits: %u. PFN bits: %u. VPN bits: %u\n",
-            current_pid, offset_bits, pfn_bits, vpn_bits);
-}
 
 
 int is_number(const char* str) {
@@ -196,6 +151,149 @@ void handle_inspection(char** tokens) {
     }
 }
 
+
+void map_page(uint32_t vpn, uint32_t pfn) {
+    if (!defined) {
+        fprintf(output_file, "Current PID: %u. Error: attempt to map page before define\n", current_pid);
+        exit(1);
+    }
+
+    if (vpn >= num_pages || pfn >= num_frames) {
+        fprintf(output_file, "Current PID: %u. Error: invalid VPN or PFN\n", current_pid);
+        exit(1);
+    }
+
+    // Copy values from old physical frame to new physical frame if there was a previous mapping
+    if (page_tables[current_pid][vpn].valid) {
+        uint32_t old_pfn = page_tables[current_pid][vpn].pfn;
+        // Copy values from old frame to new frame
+        for (uint32_t offset = 0; offset < page_size; offset++) {
+            physical_memory[(pfn << offset_bits) | offset] = 
+                physical_memory[(old_pfn << offset_bits) | offset];
+        }
+    }
+
+    // Update page table entry
+    page_tables[current_pid][vpn].pfn = pfn;
+    page_tables[current_pid][vpn].valid = TRUE;
+
+    // Invalidate any existing TLB entries for this VPN/PID combination
+    for (int i = 0; i < TLB_SIZE; i++) {
+        if (tlb[i].valid && tlb[i].vpn == vpn && tlb[i].pid == current_pid) {
+            tlb[i].valid = FALSE;
+        }
+    }
+
+    // Insert new TLB entry
+    int insert_index = -1;
+    for (int i = 0; i < TLB_SIZE; i++) {
+        if (!tlb[i].valid) {
+            insert_index = i;
+            break;
+        }
+    }
+
+    if (insert_index == -1) {
+        if (strcmp(strategy, "LRU") == 0) {
+            uint32_t min_timestamp = UINT32_MAX;
+            for (int i = 0; i < TLB_SIZE; i++) {
+                if (tlb[i].timestamp < min_timestamp) {
+                    min_timestamp = tlb[i].timestamp;
+                    insert_index = i;
+                }
+            }
+        } else {
+            insert_index = fifo_next;
+            fifo_next = (fifo_next + 1) % TLB_SIZE;
+        }
+    }
+
+    timestamp++;
+
+    tlb[insert_index].vpn = vpn;
+    tlb[insert_index].pfn = pfn;
+    tlb[insert_index].pid = current_pid;
+    tlb[insert_index].valid = TRUE;
+    tlb[insert_index].timestamp = timestamp;
+
+    fprintf(output_file, "Current PID: %u. Mapped virtual page number %u to physical frame number %u\n",
+            current_pid, vpn, pfn);
+}
+
+void unmap_page(uint32_t vpn) {
+    if (!defined) {
+        fprintf(output_file, "Current PID: %u. Error: attempt to unmap page before define\n", current_pid);
+        exit(1);
+    }
+
+    if (vpn >= num_pages) {
+        fprintf(output_file, "Current PID: %u. Error: invalid VPN\n", current_pid);
+        exit(1);
+    }
+
+    // Update page table entry
+    page_tables[current_pid][vpn].valid = FALSE;
+    page_tables[current_pid][vpn].pfn = 0;
+
+    // Remove any existing TLB entries for this VPN/PID combination
+    for (int i = 0; i < TLB_SIZE; i++) {
+        if (tlb[i].valid && tlb[i].vpn == vpn && tlb[i].pid == current_pid) {
+            tlb[i].valid = FALSE;
+        }
+    }
+
+    fprintf(output_file, "Current PID: %u. Unmapped virtual page number %u\n",
+            current_pid, vpn);
+}
+
+void initialize_memory() {
+    // Initialize physical memory
+    page_size = 1 << offset_bits;
+    num_frames = 1 << pfn_bits;
+    num_pages = 1 << vpn_bits;
+    physical_memory = calloc((1 << (offset_bits + pfn_bits)), sizeof(uint32_t));
+
+    // Initialize page tables for all processes
+    page_tables = malloc(MAX_PROCESSES * sizeof(PageTableEntry*));
+    for (int i = 0; i < MAX_PROCESSES; i++) {
+        page_tables[i] = malloc(num_pages * sizeof(PageTableEntry));
+        for (uint32_t j = 0; j < num_pages; j++) {
+            page_tables[i][j].valid = FALSE;
+        }
+    }
+
+    // Initialize TLB
+    for (int i = 0; i < TLB_SIZE; i++) {
+        tlb[i].valid = FALSE;
+    }
+
+    // Initialize process registers
+    for (int i = 0; i < MAX_PROCESSES; i++) {
+        process_registers[i].r1 = 0;
+        process_registers[i].r2 = 0;
+    }
+
+    current_pid = 0;
+    timestamp = 0;
+    defined = TRUE;
+}
+
+void handle_define(char** tokens) {
+    if (defined) {
+        fprintf(output_file, "Current PID: %u. Error: multiple calls to define in the same trace\n", current_pid);
+        exit(1);
+    }
+
+    offset_bits = atoi(tokens[1]);
+    pfn_bits = atoi(tokens[2]);
+    vpn_bits = atoi(tokens[3]);
+
+    initialize_memory();
+
+    fprintf(output_file, "Current PID: %u. Memory instantiation complete. OFF bits: %u. PFN bits: %u. VPN bits: %u\n",
+            current_pid, offset_bits, pfn_bits, vpn_bits);
+}
+
 void handle_ctxswitch(char** tokens) {
     if (!defined) {
         fprintf(output_file, "Current PID: %u. Error: attempt to execute instruction before define\n", current_pid);
@@ -203,7 +301,7 @@ void handle_ctxswitch(char** tokens) {
     }
 
     uint32_t new_pid = atoi(tokens[1]);
-    
+
     if (new_pid >= MAX_PROCESSES) {
         fprintf(output_file, "Current PID: %u. Invalid context switch to process %u\n", current_pid, new_pid);
         exit(1);
@@ -213,6 +311,7 @@ void handle_ctxswitch(char** tokens) {
     timestamp++;  // Increment after context switch
     fprintf(output_file, "Current PID: %u. Switched execution context to process: %u\n", current_pid, current_pid);
 }
+
 
 void handle_instruction(char** tokens) {
     if (!defined) {
@@ -286,19 +385,16 @@ void handle_instruction(char** tokens) {
     }
 }
 
-
 uint32_t translate_address(uint32_t virtual_addr) {
     uint32_t vpn = extract_vpn(virtual_addr);
     uint32_t offset = extract_offset(virtual_addr);
     uint32_t pfn;
     int tlb_hit = FALSE;
-    // int tlb_index = -1;
 
     // Check TLB first
     for (int i = 0; i < TLB_SIZE; i++) {
         if (tlb[i].valid && tlb[i].vpn == vpn && tlb[i].pid == current_pid) {
             tlb_hit = TRUE;
-            // tlb_index = i;
             pfn = tlb[i].pfn;
 
             // Update timestamp for LRU if needed
@@ -340,22 +436,20 @@ uint32_t translate_address(uint32_t virtual_addr) {
         // If no empty slots, apply replacement policy
         if (insert_index == -1) {
             if (strcmp(strategy, "LRU") == 0) {
-                // LRU replacement
-                int lru_index = 0;
-                for (int i = 1; i < TLB_SIZE; i++) {
-                    if (tlb[i].timestamp < tlb[lru_index].timestamp) {
-                        lru_index = i;
+                uint32_t min_timestamp = UINT32_MAX;
+                for (int i = 0; i < TLB_SIZE; i++) {
+                    if (tlb[i].timestamp < min_timestamp) {
+                        min_timestamp = tlb[i].timestamp;
+                        insert_index = i;
                     }
                 }
-                insert_index = lru_index;
             } else {
-                // FIFO replacement
                 insert_index = fifo_next;
                 fifo_next = (fifo_next + 1) % TLB_SIZE;
             }
         }
 
-        // Update the TLB entry
+        // Update TLB entry
         tlb[insert_index].vpn = vpn;
         tlb[insert_index].pfn = pfn;
         tlb[insert_index].pid = current_pid;
@@ -366,85 +460,16 @@ uint32_t translate_address(uint32_t virtual_addr) {
     return (pfn << offset_bits) | offset;
 }
 
-void map_page(uint32_t vpn, uint32_t pfn) {
-    if (!defined) {
-        fprintf(output_file, "Current PID: %u. Error: attempt to map page before define\n", current_pid);
-        exit(1);
-    }
-
-    if (vpn >= num_pages || pfn >= num_frames) {
-        fprintf(output_file, "Current PID: %u. Error: invalid VPN or PFN\n", current_pid);
-        exit(1);
-    }
-
-    // Update page table entry
-    page_tables[current_pid][vpn].pfn = pfn;
-    page_tables[current_pid][vpn].valid = TRUE;
-
-    // Find an empty TLB slot or apply the replacement policy
-    int insert_index = -1;
-    for (int i = 0; i < TLB_SIZE; i++) {
-        if (!tlb[i].valid) {
-            insert_index = i;
-            break;
+int get_lru_tlb_entry() {
+    int lru_index = 0;
+    for (int i = 1; i < TLB_SIZE; i++) {
+        if (tlb[i].timestamp < tlb[lru_index].timestamp) {
+            lru_index = i;
         }
     }
-
-    // If no empty slot found, apply replacement policy
-    if (insert_index == -1) {
-        if (strcmp(strategy, "LRU") == 0) {
-            int lru_index = 0;
-            for (int i = 1; i < TLB_SIZE; i++) {
-                if (tlb[i].timestamp < tlb[lru_index].timestamp) {
-                    lru_index = i;
-                }
-            }
-            insert_index = lru_index;
-        } else {
-            // FIFO replacement
-            insert_index = fifo_next;
-            fifo_next = (fifo_next + 1) % TLB_SIZE;
-        }
-    }
-
-    timestamp++;  // Increment timestamp for map operation
-    
-    // Insert the VPN to PFN mapping in the TLB
-    tlb[insert_index].vpn = vpn;
-    tlb[insert_index].pfn = pfn;
-    tlb[insert_index].pid = current_pid;
-    tlb[insert_index].valid = TRUE;
-    tlb[insert_index].timestamp = timestamp;
-
-    fprintf(output_file, "Current PID: %u. Mapped virtual page number %u to physical frame number %u\n",
-            current_pid, vpn, pfn);
+    return lru_index;
 }
 
-void unmap_page(uint32_t vpn) {
-    if (!defined) {
-        fprintf(output_file, "Current PID: %u. Error: attempt to unmap page before define\n", current_pid);
-        exit(1);
-    }
-
-    if (vpn >= num_pages) {
-        fprintf(output_file, "Current PID: %u. Error: invalid VPN\n", current_pid);
-        exit(1);
-    }
-
-    // Update page table entry
-    page_tables[current_pid][vpn].valid = FALSE;
-    page_tables[current_pid][vpn].pfn = 0;
-
-    // Remove any existing TLB entries for this VPN/PID combination
-    for (int i = 0; i < TLB_SIZE; i++) {
-        if (tlb[i].valid && tlb[i].vpn == vpn && tlb[i].pid == current_pid) {
-            tlb[i].valid = FALSE;
-        }
-    }
-
-    fprintf(output_file, "Current PID: %u. Unmapped virtual page number %u\n",
-            current_pid, vpn);
-}
 
 int main(int argc, char* argv[]) {
     const char usage[] = "Usage: memsym.out <strategy> <input trace> <output trace>\n";
