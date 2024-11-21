@@ -8,14 +8,14 @@
 #define MAX_QUEUE_SIZE 1000
 #define BATCH_SIZE 10
 #define MAX_LOG_LINE 2048
-#define MAX_PRIMES_BUFFER 100000  // Increased buffer size for more primes
+#define MAX_PRIMES_BUFFER 1536
 
 // Structure to hold an operation
 typedef struct {
     char op[4];      // Operation type (set, add, sub, mul, div, pri, pia, fib)
     int ctx;         // Context number
     double val;      // Value for operation
-} Operation;    
+} Operation;
 
 // Structure to hold a queue of operations for a context
 typedef struct {
@@ -52,34 +52,6 @@ int is_prime(int n) {
     }
     return 1;
 }
-int count_primes(int n) {
-    // Allocate a boolean array to mark non-prime numbers
-    char* is_prime = malloc((n + 1) * sizeof(char));
-    if (is_prime == NULL) return 0;
-
-    // Initialize all numbers as prime
-    memset(is_prime, 1, (n + 1) * sizeof(char));
-    is_prime[0] = is_prime[1] = 0;  // 0 and 1 are not prime
-
-    // Use Sieve of Eratosthenes algorithm
-    for (int i = 2; i * i <= n; i++) {
-        if (is_prime[i]) {
-            // Mark multiples of i as non-prime
-            for (int j = i * i; j <= n; j += i) {
-                is_prime[j] = 0;
-            }
-        }
-    }
-
-    // Count the number of primes
-    int count = 0;
-    for (int i = 2; i <= n; i++) {
-        if (is_prime[i]) count++;
-    }
-
-    free(is_prime);
-    return count;
-} 
 
 // Function to compute prime factors
 void compute_primes(int n, char* result, size_t result_size) {
